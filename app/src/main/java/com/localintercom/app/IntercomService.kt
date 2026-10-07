@@ -20,7 +20,7 @@ class IntercomService:Service(){
   routeCommunicationAudio()
   getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL,"Local Intercom",NotificationManager.IMPORTANCE_LOW))
   startForeground(41,note("Αναζήτηση στο Hotspot…"))
-  startDiscovery()
+  try{startDiscovery()}catch(_:Exception){connected=false;refresh()}
  }
  override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{
   when(i?.action){
@@ -43,7 +43,7 @@ class IntercomService:Service(){
   }
  }
  private fun startDiscovery(){
-  discovery?.stop()
+  try{discovery?.stop()}catch(_:Exception){}
   discovery=PeerDiscovery{ip->
    if(engine==null){
     try{
@@ -52,7 +52,8 @@ class IntercomService:Service(){
      connected=true;refresh()
     }catch(_:Exception){connected=false;engine?.stop();engine=null;refresh()}
    }
-  }.also{it.start()}
+  }
+  try{discovery?.start()}catch(_:Exception){discovery=null;connected=false;refresh()}
  }
  private fun note(text:String):Notification{
   val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
