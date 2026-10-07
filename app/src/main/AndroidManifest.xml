@@ -7,7 +7,8 @@
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-<application android:theme="@style/AppTheme" android:label="Local Intercom">
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+<application android:theme="@style/AppTheme" android:label="Local Intercom" android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher">
 <service android:name=".IntercomService" android:foregroundServiceType="microphone" android:exported="false"/>
 <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
 </application></manifest>
