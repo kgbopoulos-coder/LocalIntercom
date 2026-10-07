@@ -31,10 +31,15 @@ class IntercomService:Service(){
  }
  private fun routeCommunicationAudio(){
   if(Build.VERSION.SDK_INT>=31){
-   val preferred=audio.availableCommunicationDevices.firstOrNull{it.type==AudioDeviceInfo.TYPE_WIRED_HEADSET}
-    ?:audio.availableCommunicationDevices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLE_HEADSET}
-    ?:audio.availableCommunicationDevices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLUETOOTH_SCO}
-   if(preferred!=null) audio.setCommunicationDevice(preferred)
+   try{
+    val devices=audio.availableCommunicationDevices
+    val preferred=devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_WIRED_HEADSET}
+     ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLE_HEADSET}
+     ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLUETOOTH_SCO}
+    if(preferred!=null) audio.setCommunicationDevice(preferred)
+   }catch(_:SecurityException){
+    // Bluetooth permission is optional; Android keeps the current/default route.
+   }catch(_:Exception){}
   }
  }
  private fun startDiscovery(){
