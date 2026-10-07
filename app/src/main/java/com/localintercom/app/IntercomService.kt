@@ -12,11 +12,13 @@ class IntercomService:Service(){
  }
  private var discovery:PeerDiscovery?=null; private var engine:AudioEngine?=null
  private lateinit var audio:AudioManager
+ private var audioCallback:AudioDeviceCallback?=null
 
  override fun onCreate(){
   super.onCreate();running=true
   audio=getSystemService(AUDIO_SERVICE) as AudioManager
   audio.mode=AudioManager.MODE_IN_COMMUNICATION
+  registerAudioRouting()
   routeCommunicationAudio()
   getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL,"Local Intercom",NotificationManager.IMPORTANCE_LOW))
   startForeground(41,note("Αναζήτηση στο Hotspot…"))
@@ -29,14 +31,22 @@ class IntercomService:Service(){
   }
   return START_STICKY
  }
+ private fun registerAudioRouting(){
+  audioCallback=object:AudioDeviceCallback(){
+   override fun onAudioDevicesAdded(added:Array<out AudioDeviceInfo>){routeCommunicationAudio()}
+   override fun onAudioDevicesRemoved(removed:Array<out AudioDeviceInfo>){routeCommunicationAudio()}
+  }
+  try{audio.registerAudioDeviceCallback(audioCallback,null)}catch(_:Exception){}
+ }
  private fun routeCommunicationAudio(){
   if(Build.VERSION.SDK_INT>=31){
    try{
     val devices=audio.availableCommunicationDevices
-    val preferred=devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_WIRED_HEADSET}
-     ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLE_HEADSET}
+    val preferred=devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLE_HEADSET}
      ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_BLUETOOTH_SCO}
-    if(preferred!=null) audio.setCommunicationDevice(preferred)
+     ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_WIRED_HEADSET}
+     ?:devices.firstOrNull{it.type==AudioDeviceInfo.TYPE_USB_HEADSET}
+    if(preferred!=null && audio.communicationDevice?.id!=preferred.id) audio.setCommunicationDevice(preferred)
    }catch(_:SecurityException){
     // Bluetooth permission is optional; Android keeps the current/default route.
    }catch(_:Exception){}
@@ -64,7 +74,8 @@ class IntercomService:Service(){
  private fun refresh(){getSystemService(NotificationManager::class.java).notify(41,note(if(connected)"Connected 🟢" else "Searching…"))}
  override fun onDestroy(){
   running=false;connected=false;discovery?.stop();engine?.stop()
-  if(Build.VERSION.SDK_INT>=31)audio.clearCommunicationDevice()
+  try{audioCallback?.let{audio.unregisterAudioDeviceCallback(it)}}catch(_:Exception){}
+  if(Build.VERSION.SDK_INT>=31)try{audio.clearCommunicationDevice()}catch(_:Exception){}
   audio.mode=AudioManager.MODE_NORMAL
   super.onDestroy()
  }
