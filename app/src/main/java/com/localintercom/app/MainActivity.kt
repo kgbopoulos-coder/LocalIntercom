@@ -10,7 +10,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 class MainActivity:AppCompatActivity(){
  private lateinit var status:TextView;private lateinit var mute:Button
- override fun onCreate(x:Bundle?){super.onCreate(x);val l=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;padding(48,48,48,48)}
+ override fun onCreate(x:Bundle?){super.onCreate(x);val l=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(48,48,48,48)}
  val h=TextView(this).apply{text="LOCAL INTERCOM";textSize=30f};status=TextView(this).apply{textSize=18f;setPadding(0,50,0,50)}
  mute=Button(this).apply{setOnClickListener{startService(Intent(this@MainActivity,IntercomService::class.java).setAction(IntercomService.ACTION_MUTE));update()}}
  val i=TextView(this).apply{text="Hotspot/Wi‑Fi • Full duplex • Background audio\nΜπορείς να κλειδώσεις την οθόνη αφού ξεκινήσει.";gravity=Gravity.CENTER;setPadding(0,40,0,0)}
