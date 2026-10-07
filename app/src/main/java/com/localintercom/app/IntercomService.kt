@@ -15,7 +15,7 @@ class IntercomService:Service(){
   val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
   val mi=PendingIntent.getService(this,1,Intent(this,IntercomService::class.java).setAction(ACTION_MUTE),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
   val st=PendingIntent.getService(this,2,Intent(this,IntercomService::class.java).setAction(ACTION_STOP),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-  return NotificationCompat.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.stat_sys_call_record).setContentTitle("Local Intercom").setContentText(text).setOngoing(true).setContentIntent(open).addAction(0,if(muted)"Unmute" else "Mute",mi).addAction(0,"Stop",st).build()}
+  return NotificationCompat.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.ic_btn_speak_now).setContentTitle("Local Intercom").setContentText(text).setOngoing(true).setContentIntent(open).addAction(0,if(muted)"Unmute" else "Mute",mi).addAction(0,"Stop",st).build()}
  private fun refresh(){getSystemService(NotificationManager::class.java).notify(41,note(if(connected)"Connected 🟢" else "Searching…"))}
  override fun onDestroy(){connected=false;discovery?.stop();engine?.stop();super.onDestroy()}
  override fun onBind(i:Intent?):IBinder?=null
