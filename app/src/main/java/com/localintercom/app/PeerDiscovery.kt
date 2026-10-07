@@ -4,79 +4,79 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class PeerDiscovery(private val found:(InetAddress)->Unit){
  private val running=AtomicBoolean(false)
- private var socket:DatagramSocket?=null
- private val port=40403
- private val magic="LOCAL_INTERCOM_V3"
- private val local=mutableSetOf<String>()
+ private var server:ServerSocket?=null
+ private val tcpPort=40405
+ private val hello="LOCAL_INTERCOM_TCP_V1"
 
  fun start(){
   if(!running.compareAndSet(false,true))return
-  collectLocal()
-  socket=DatagramSocket(null).apply{
-   reuseAddress=true
-   bind(InetSocketAddress(port))
-   broadcast=true
-   soTimeout=250
-  }
-  Thread({loop()},"IntercomDiscovery").start()
+  Thread({acceptLoop()},"IntercomAccept").start()
+  Thread({connectLoop()},"IntercomConnect").start()
  }
 
- private fun loop(){
-  val buf=ByteArray(128)
-  while(running.get()){
-   sendDiscovery()
-   val end=System.currentTimeMillis()+700
-   while(running.get()&&System.currentTimeMillis()<end){
+ // Every phone listens. The hotspot client also tries the subnet gateway first.
+ // Whichever TCP connection succeeds gives us the peer IP reliably; UDP is then used only for audio.
+ private fun acceptLoop(){
+  try{
+   server=ServerSocket().apply{reuseAddress=true;bind(InetSocketAddress(tcpPort))}
+   while(running.get()){
     try{
-     val p=DatagramPacket(buf,buf.size);socket?.receive(p)
-     val text=String(p.data,0,p.length)
-     if(text.startsWith(magic)&&!local.contains(p.address.hostAddress)){
-      // Always answer directly so hotspot client isolation/broadcast quirks do not matter after first sighting.
-      try{val reply=magic.toByteArray();socket?.send(DatagramPacket(reply,reply.size,p.address,port))}catch(_:Exception){}
-      found(p.address)
+     val c=server?.accept()?:break
+     c.soTimeout=1200
+     val line=c.getInputStream().bufferedReader().readLine()
+     if(line==hello){
+      c.getOutputStream().bufferedWriter().apply{write(hello);newLine();flush()}
+      found(c.inetAddress)
      }
-    }catch(_:SocketTimeoutException){break}catch(_:Exception){}
+     c.close()
+    }catch(_:Exception){}
    }
-   try{Thread.sleep(250)}catch(_:InterruptedException){}
+  }catch(_:Exception){}
+ }
+
+ private fun connectLoop(){
+  while(running.get()){
+   val targets=targets()
+   for(ip in targets){
+    if(!running.get())break
+    try{
+     val c=Socket()
+     c.connect(InetSocketAddress(ip,tcpPort),90)
+     c.soTimeout=700
+     c.getOutputStream().bufferedWriter().apply{write(hello);newLine();flush()}
+     val reply=c.getInputStream().bufferedReader().readLine()
+     if(reply==hello){found(c.inetAddress);c.close();Thread.sleep(1500);break}
+     c.close()
+    }catch(_:Exception){}
+   }
+   try{Thread.sleep(700)}catch(_:InterruptedException){}
   }
  }
 
- private fun sendDiscovery(){
-  val data=magic.toByteArray()
-  val targets=linkedSetOf<InetAddress>()
+ private fun targets():List<InetAddress>{
+  val out=LinkedHashSet<InetAddress>()
+  val mine=HashSet<String>()
   try{
    val en=NetworkInterface.getNetworkInterfaces()
    while(en.hasMoreElements()){
     val ni=en.nextElement()
     if(!ni.isUp||ni.isLoopback)continue
-    for(ia in ni.interfaceAddresses){
-     ia.broadcast?.let{targets.add(it)}
-     val a=ia.address
+    val addrs=ni.inetAddresses
+    while(addrs.hasMoreElements()){
+     val a=addrs.nextElement()
      if(a is Inet4Address&&!a.isLoopbackAddress){
+      mine.add(a.hostAddress?:"")
       val b=a.address
       val prefix=(b[0].toInt() and 255).toString()+"."+(b[1].toInt() and 255)+"."+(b[2].toInt() and 255)+"."
-      // Android hotspots commonly use /24. Probe likely peer addresses without manual IP.
-      for(i in 1..254)if(prefix+i!=a.hostAddress)try{targets.add(InetAddress.getByName(prefix+i))}catch(_:Exception){}
+      // Hotspot hosts are commonly .1; try likely host addresses first, then the /24.
+      for(i in listOf(1,254,2))try{out.add(InetAddress.getByName(prefix+i))}catch(_:Exception){}
+      for(i in 1..254)try{out.add(InetAddress.getByName(prefix+i))}catch(_:Exception){}
      }
     }
    }
   }catch(_:Exception){}
-  try{targets.add(InetAddress.getByName("255.255.255.255"))}catch(_:Exception){}
-  for(t in targets)try{socket?.send(DatagramPacket(data,data.size,t,port))}catch(_:Exception){}
+  return out.filter{!mine.contains(it.hostAddress)}
  }
 
- private fun collectLocal(){
-  local.clear()
-  try{
-   val en=NetworkInterface.getNetworkInterfaces()
-   while(en.hasMoreElements()){
-    val ni=en.nextElement()
-    if(!ni.isUp)continue
-    val ips=ni.inetAddresses
-    while(ips.hasMoreElements())ips.nextElement().hostAddress?.let{local.add(it.substringBefore("%"))}
-   }
-  }catch(_:Exception){}
- }
-
- fun stop(){running.set(false);try{socket?.close()}catch(_:Exception){}}
+ fun stop(){running.set(false);try{server?.close()}catch(_:Exception){}}
 }
