@@ -7,8 +7,8 @@ import androidx.core.app.NotificationCompat
 
 class IntercomService:Service(){
  companion object {
-  const val ACTION_MUTE="com.localintercom.MUTE"; const val ACTION_STOP="com.localintercom.STOP"; const val CHANNEL="intercom"
-  @Volatile var running=false; @Volatile var connected=false; @Volatile var muted=false
+  const val ACTION_VOLUME="com.localintercom.VOLUME"; const val EXTRA_VOLUME="volume"; const val ACTION_MUTE="com.localintercom.MUTE"; const val ACTION_STOP="com.localintercom.STOP"; const val CHANNEL="intercom"
+  @Volatile var volumePercent=160; @Volatile var running=false; @Volatile var connected=false; @Volatile var muted=false
  }
  private var discovery:PeerDiscovery?=null; private var engine:AudioEngine?=null
  private lateinit var audio:AudioManager
@@ -16,6 +16,7 @@ class IntercomService:Service(){
 
  override fun onCreate(){
   super.onCreate();running=true
+  volumePercent=getSharedPreferences("intercom",MODE_PRIVATE).getInt("volume",160).coerceIn(0,250)
   audio=getSystemService(AUDIO_SERVICE) as AudioManager
   audio.mode=AudioManager.MODE_IN_COMMUNICATION
   registerAudioRouting()
@@ -27,6 +28,7 @@ class IntercomService:Service(){
  override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{
   when(i?.action){
    ACTION_MUTE->{muted=!muted;engine?.muted=muted;refresh()}
+   ACTION_VOLUME->{volumePercent=i.getIntExtra(EXTRA_VOLUME,160).coerceIn(0,250);getSharedPreferences("intercom",MODE_PRIVATE).edit().putInt("volume",volumePercent).apply();engine?.volumeGain=volumePercent/100f}
    ACTION_STOP->{stopSelf();return START_NOT_STICKY}
   }
   return START_STICKY
@@ -58,7 +60,7 @@ class IntercomService:Service(){
    if(engine==null){
     try{
      routeCommunicationAudio()
-     engine=AudioEngine(ip).also{it.muted=muted;it.start()}
+     engine=AudioEngine(ip).also{it.muted=muted;it.volumeGain=volumePercent/100f;it.start()}
      connected=true;refresh()
     }catch(_:Exception){connected=false;engine?.stop();engine=null;refresh()}
    }
