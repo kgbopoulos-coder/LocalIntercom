@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 class MainActivity:AppCompatActivity(){
  private lateinit var status:TextView
  private lateinit var mute:Button
+ private lateinit var volumeLabel:TextView
  private val handler=Handler(Looper.getMainLooper())
  private val ticker=object:Runnable{override fun run(){update();handler.postDelayed(this,750)}}
 
@@ -23,7 +24,16 @@ class MainActivity:AppCompatActivity(){
   status=TextView(this).apply{textSize=18f;setPadding(0,50,0,50)}
   mute=Button(this).apply{setOnClickListener{safeService(IntercomService.ACTION_MUTE)}}
   val stop=Button(this).apply{text="STOP INTERCOM";setOnClickListener{safeService(IntercomService.ACTION_STOP)}}
-  box.addView(status);box.addView(mute);box.addView(stop)
+  box.addView(status);box.addView(mute)
+  volumeLabel=TextView(this).apply{textSize=17f;setPadding(0,25,0,8)}
+  val saved=getSharedPreferences("intercom",MODE_PRIVATE).getInt("volume",160).coerceIn(0,250)
+  volumeLabel.text="Ένταση ακουστικών: $saved%"
+  val volume=SeekBar(this).apply{max=250;progress=saved;setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+   override fun onProgressChanged(bar:SeekBar?,value:Int,fromUser:Boolean){if(fromUser){volumeLabel.text="Ένταση ακουστικών: $value%";try{startService(Intent(this@MainActivity,IntercomService::class.java).setAction(IntercomService.ACTION_VOLUME).putExtra(IntercomService.EXTRA_VOLUME,value))}catch(_:Exception){}}}
+   override fun onStartTrackingTouch(bar:SeekBar?){}
+   override fun onStopTrackingTouch(bar:SeekBar?){}
+  })}
+  box.addView(volumeLabel);box.addView(volume);box.addView(stop)
   box.addView(TextView(this).apply{text="Hotspot / Wi-Fi • Full duplex • Background audio";gravity=Gravity.CENTER;setPadding(0,40,0,0)})
   setContentView(box)
   onBackPressedDispatcher.addCallback(this,object:OnBackPressedCallback(true){override fun handleOnBackPressed(){moveTaskToBack(true)}})
